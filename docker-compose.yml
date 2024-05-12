@@ -1,0 +1,37 @@
+version: "3.9"
+# x-default-logging: &logging
+#   driver: "json-file"
+#   options:
+#     max-size: "5m"
+#     max-file: "2"
+
+# networks:
+#   default: opentelemetry-demo
+#   driver: bridge
+
+services:
+#   accountingservice:
+#   image: ${IMAGE_NAME}:${IMAGE_VERSION}-accountingservice
+#   container_name: accounting-services
+  
+  # OpenTelemetry Collector
+  opentelemetry-collector:
+    image: otel/opentelemetry-collector:latest
+    container_name: opentelemetry-collector
+    deploy:
+      resources:
+        limits:
+          memory: 200M
+    restart: unless-stopped
+    command: [ "--config=/etc/otelcol-config.yml", "--config=/etc/otelcol-config-extras.yml" ]
+    volumes:
+      - ./src/otelcollector/otelcol-config.yml:/etc/otelcol-config.yml
+      - ./src/otelcollector/otelcol-config-extras.yml:/etc/otelcol-config-extras.yml
+    ports:
+      - "${OTEL_COLLECTOR_PORT_GRPC}"
+      - "${OTEL_COLLECTOR_PORT_HTTP}"
+    depends_on:
+      - jaeger
+    logging: *logging
+    environment:
+      - ENVOY_PORT
