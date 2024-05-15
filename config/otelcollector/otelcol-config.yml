@@ -2,7 +2,9 @@ receivers:
   otlp:
     protocols:
       grpc:
-        endpoint: otel-collector:4317
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
       # http:
       #   cors:
       #     allowed_origins:
@@ -16,9 +18,23 @@ receivers:
   #   collection_interval: 10s
 
 exporters:
+  debug:
+    verbosity: detailed
+  
+  logging:
+    verbosity: detailed
+
   prometheus:
     endpoint: otel-collector:8889
-  # debug:
+
+  otlp:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+
+  file:
+    path: /etc/output/logs.json
+
 #   otlp:
 #     endpoint: "jaeger:4317"
 #     tls:
@@ -35,10 +51,12 @@ exporters:
 #         insecure: true
 
 processors:
+  attributes:
+    actions:
+      - key: evironment
+        value: local
+        action: insert
   batch:
-
-# connectors:
-#   spanmetrics:
 
 extensions:
   health_check:
@@ -46,18 +64,19 @@ extensions:
 
 service:
   extensions: [health_check]
+  telemetry:
+    logs: 
+      level: debug
   pipelines:
-#     traces:
-#       receivers: [otlp]
-#       processors: [batch]
-#       exporters: [otlp, debug, spanmetrics]
-     metrics:
-        receivers: [otlp]
-#       receivers: [httpcheck/frontendproxy, redis, otlp, spanmetrics]
-        processors: [batch]
-        # exporters: [otlphttp/prometheus, debug]
-        exporters: [prometheus]
-#     logs:
-#       receivers: [otlp]
-#       processors: [batch]
-#       exporters: [opensearch, debug]
+    traces:
+      receivers: [otlp]
+      processors: [batch, attributes]
+      exporters: [debug, otlp, file, logging]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug, prometheus, logging]
+    logs:
+      receivers: [otlp]
+      processors: [attributes]
+      exporters: [debug, file, logging]

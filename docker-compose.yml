@@ -99,7 +99,7 @@ services:
       - "GF_INSTALL_PLUGINS=grafana-opensearch-datasource"
     volumes:
       - ./config/grafana/grafana.ini:/etc/grafana/grafana.ini
-      - ./config/grafana/provisioning/:/etc/grafana/provisioning/
+      # - ./config/grafana/provisioning/:/etc/grafana/provisioning/
       - grafana-data:/var/lib/grafana
     ports:
       - "3000:3000"
@@ -108,6 +108,26 @@ services:
     # ports:
     #   - "${GRAFANA_SERVICE_PORT}"
     # logging: *logging
+
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    deploy:
+          resources:
+            limits:
+              memory: 500M
+    ports:
+          - "16686:16686"                    # Jaeger UI
+          - "4317"                           # OTLP gRPC default port
+          - "4318"                           # OTLP HTTP default port (protobuf)
+          - "14250"
+    environment:
+      - LOG_LEVEL=debug
+      - METRICS_STORAGE_TYPE=prometheus
+    restart: unless-stopped
+    networks:
+      - otel
 
   #zipkin
   # zipkin:
