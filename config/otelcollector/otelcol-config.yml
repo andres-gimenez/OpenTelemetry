@@ -2,20 +2,9 @@ receivers:
   otlp:
     protocols:
       grpc:
-        endpoint: 0.0.0.0:4317
+        # endpoint: 0.0.0.0:4317
       http:
-        endpoint: 0.0.0.0:4318
-      # http:
-      #   cors:
-      #     allowed_origins:
-      #       - "http://*"
-      #       - "https://*"
-  # httpcheck/frontendproxy:
-  #   targets:
-  #     - endpoint: http://frontendproxy:${env:ENVOY_PORT}
-  # redis:
-  #   endpoint: "redis-cart:6379"
-  #   collection_interval: 10s
+        # endpoint: 0.0.0.0:4318
 
 exporters:
   debug:
@@ -67,6 +56,9 @@ service:
   telemetry:
     logs: 
       level: debug
+    metrics:
+      level: detailed
+      address: ":8888"   # http://localhost:8888/metrics
   pipelines:
     traces:
       receivers: [otlp]
