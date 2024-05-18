@@ -1,0 +1,13 @@
+# Dotenv
+.env
+.env.*
+!.env.example
+
+# Node Package Manager
+node_modules
+
+# Certs
+certs/
+
+# Logs
+logs/
