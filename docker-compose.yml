@@ -1,12 +1,12 @@
-# x-default-logging: &logging
-#   driver: "json-file"
-#   options:
-#     max-size: "5m"
-#     max-file: "2"
+x-default-logging: &logging
+  driver: "json-file"
+  options:
+    max-size: "5m"
+    max-file: "2"
 
 networks:
   otel:
-    name: otel-test
+    name: otel-dev
     driver: bridge
 
 volumes:
@@ -20,11 +20,74 @@ services:
 #   image: ${IMAGE_NAME}:${IMAGE_VERSION}-accountingservice
 #   container_name: accounting-services
   
+  # nginx-proxy:
+  #   image: nginx:latest
+  #   container_name: ${APP_NAME}-nginx-proxy
+  #   ports:
+  #     - '80:80'
+  #     - '443:443'
+  #   volumes:
+  #     - "./config/nginx/:/etc/nginx/templates/:ro"
+  #     - ./src:/var/www/html:rw,cached
+  #     - ./certs:/etc/certs:ro
+  #   environment:
+  #     - "NGINX_ENVSUBST_TEMPLATE_SUFFIX=.conf"
+  #     - "DOMAIN=${DOMAIN}"
+  #   depends_on:
+  #     - otel-collector
+  #   restart: always
+  #   networks:
+  #     - otel
+
+  frontendproxy:
+    image: envoyproxy/envoy:v1.29-latest
+    container_name: frontend-proxy
+    deploy:
+      resources:
+        limits:
+          memory: 50M
+    restart: unless-stopped
+    ports:
+      # - "${ENVOY_PORT}:${ENVOY_PORT}"
+      - 8082:8082
+      - 10000:10000
+    volumes:
+      - ./config/frontendproxy/envoy.yaml:/etc/envoy/envoy.yaml
+    networks:
+      - otel
+    # environment:
+      # - FRONTEND_PORT
+      # - FRONTEND_HOST
+      # - LOCUST_WEB_HOST
+      # - LOCUST_WEB_PORT
+      # - GRAFANA_SERVICE_PORT
+      # - GRAFANA_SERVICE_HOST
+      # - JAEGER_SERVICE_PORT
+      # - JAEGER_SERVICE_HOST
+      # - OTEL_COLLECTOR_HOST
+      # - IMAGE_PROVIDER_HOST
+      # - IMAGE_PROVIDER_PORT
+      # - OTEL_COLLECTOR_PORT_GRPC
+      # - OTEL_COLLECTOR_PORT_HTTP
+      # - OTEL_RESOURCE_ATTRIBUTES
+      # - ENVOY_PORT
+      # - FLAGD_HOST
+      # - FLAGD_PORT
+    # depends_on:
+    #   frontend:
+    #     condition: service_started
+    #   loadgenerator:
+    #     condition: service_started
+    #   jaeger:
+    #     condition: service_started
+    #   grafana:
+    #     condition: service_started
+
   # OpenTelemetry Collector
   otel-collector:
     # image: ${COLLECTOR_CONTRIB_IMAGE}
     image: otel/opentelemetry-collector:latest
-    container_name: opentelemetry-collector
+    container_name: ${APP_NAME}-collector
     deploy:
       resources:
         limits:
@@ -32,9 +95,9 @@ services:
     restart: unless-stopped
     command: [ "--config=/etc/otelcol-config.yml", "--config=/etc/otelcol-config-extras.yml" ]
     volumes:
-      - ./config/otelcollector/otelcol-config.yml:/etc/otelcol-config.yml
-      - ./config/otelcollector/otelcol-config-extras.yml:/etc/otelcol-config-extras.yml
-      - ./log/telemetry/:/etc/output:rw # Storage the logs (not commited in git)
+      - ./config/otelcollector/otelcol-config.yml:/etc/otelcol-config.yml:ro
+      - ./config/otelcollector/otelcol-config-extras.yml:/etc/otelcol-config-extras.yml:ro
+      - ./logs/otel/:/etc/output:rw # Storage the logs (not commited in git)
     ports:
       # - "${OTEL_COLLECTOR_PORT_GRPC}"
       # - "${OTEL_COLLECTOR_PORT_HTTP}"
@@ -47,7 +110,7 @@ services:
       - otel
     # depends_on:
     #   - jaeger
-    # logging: *logging
+    logging: *logging
     # environment:
     #   - 8083
    
@@ -57,7 +120,7 @@ services:
     # image: quay.io/prometheus/prometheus:v2.51.2
     # image: bitnami/prometheus
     image: prom/prometheus:latest
-    container_name: prometheus
+    container_name: ${APP_NAME}-prometheus
     # command:
     #   - --web.console.templates=/etc/prometheus/consoles
     #   - --web.console.libraries=/etc/prometheus/console_libraries
@@ -69,8 +132,8 @@ services:
     #   - --enable-feature=exemplar-storage
     #   - --enable-feature=otlp-write-receiver
     volumes:
-      - ./config/prometheus/prometheus-config.yml:/etc/prometheus/prometheus-config.yml
-      - prometheus-data:/prometheus
+      - ./config/prometheus/prometheus-config.yml:/etc/prometheus/prometheus-config.yml:ro
+      - prometheus-data:/prometheus:rw
     command:
      - '--config.file=/etc/prometheus/prometheus-config.yml'
     deploy:
@@ -84,13 +147,13 @@ services:
       - otel
     # ports:
     #    - "${PROMETHEUS_SERVICE_PORT}:${PROMETHEUS_SERVICE_PORT}"
-    # logging: *logging
+    logging: *logging
 
   # Grafana
   grafana:
     image: grafana/grafana:latest
     # image: ${GRAFANA_IMAGE}
-    container_name: grafana
+    container_name: ${APP_NAME}-grafana
     deploy:
       resources:
         limits:
@@ -99,21 +162,20 @@ services:
     environment:
       - "GF_INSTALL_PLUGINS=grafana-opensearch-datasource"
     volumes:
-      - ./config/grafana/grafana.ini:/etc/grafana/grafana.ini
-      - ./config/grafana/provisioning/:/etc/grafana/provisioning/
-      - grafana-data:/var/lib/grafana
+      - ./config/grafana/grafana.ini:/etc/grafana/grafana.ini:ro
+      - ./config/grafana/provisioning/:/etc/grafana/provisioning/:ro
+      - grafana-data:/var/lib/grafana:rw
     ports:
       - "3000:3000"
     networks:
       - otel
     # ports:
     #   - "${GRAFANA_SERVICE_PORT}"
-    # logging: *logging
-
+    logging: *logging
 
   jaeger:
     image: jaegertracing/all-in-one:latest
-    container_name: jaeger
+    container_name: ${APP_NAME}-jaeger
     deploy:
           resources:
             limits:
@@ -129,6 +191,7 @@ services:
     restart: unless-stopped
     networks:
       - otel
+    logging: *logging
 
   #zipkin
   # zipkin:
